@@ -16,13 +16,21 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const [households, setHouseholds] = useState<CloudHousehold[] | null>(null);
 
-  useEffect(() => { restoreCloudSession().then(setSession).finally(() => setChecking(false)); }, []);
+  useEffect(() => {
+    restoreCloudSession()
+      .then(setSession)
+      .catch(() => setSession(null))
+      .finally(() => setChecking(false));
+  }, []);
   useEffect(() => {
     if (!session) return;
     listMyHouseholds(session).then((items) => {
       setHouseholds(items);
       if (items[0]) window.localStorage.setItem("wuli-active-household", items[0].id);
-    }).catch((reason) => setError(reason instanceof Error ? reason.message : "家庭信息读取失败"));
+    }).catch((reason) => {
+      setError(reason instanceof Error ? reason.message : "家庭信息读取失败，请检查网络后重试");
+      setHouseholds([]);
+    });
   }, [session]);
 
   async function submit(event: FormEvent) {
@@ -35,6 +43,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   if (checking) return <main className="auth-shell"><div className="auth-loading">正在打开屋里…</div></main>;
   if (localMode) return <>{children}</>;
   if (session && households === null) return <main className="auth-shell"><div className="auth-loading">正在整理你的家庭…</div></main>;
+  if (session && households?.length === 0 && error) return <main className="auth-shell"><section className="onboard-panel"><header><div className="auth-brand"><HouseLine size={22} weight="fill" /><span>屋里</span></div><h1>网络有点慢</h1><p>{error}</p></header><div className="onboard-options"><button onClick={() => window.location.reload()}><span><b>重新连接</b><small>刷新后再次读取家庭数据</small></span><ArrowRight size={17} /></button><button onClick={() => setLocalMode(true)}><span><b>先进入本地模式</b><small>稍后网络恢复后再同步</small></span><ArrowRight size={17} /></button></div></section></main>;
   if (session && households?.length === 0) return <HouseholdOnboarding session={session} onReady={async () => {
     const items = await listMyHouseholds(session); setHouseholds(items); if (items[0]) window.localStorage.setItem("wuli-active-household", items[0].id);
   }} />;
