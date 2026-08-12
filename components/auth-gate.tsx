@@ -8,7 +8,7 @@ import { CloudProvider } from "@/lib/cloud-context";
 export function AuthGate({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<CloudSession | null>(null);
   const [checking, setChecking] = useState(true);
-  const [localMode, setLocalMode] = useState(false);
+  const [localMode, setLocalMode] = useState(true);
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
   const [sent, setSent] = useState(false);
@@ -17,6 +17,14 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [households, setHouseholds] = useState<CloudHousehold[] | null>(null);
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hasLoginCallback = window.location.hash.includes("access_token");
+    const wantsCloud = params.get("cloud") === "1" || hasLoginCallback;
+    if (!wantsCloud) {
+      setChecking(false);
+      return;
+    }
+    setLocalMode(false);
     restoreCloudSession()
       .then(setSession)
       .catch(() => setSession(null))
