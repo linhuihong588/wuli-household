@@ -3,6 +3,11 @@
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const SESSION_KEY = "wuli-cloud-session";
+const REQUEST_TIMEOUT_MS = 12_000;
+
+function withTimeout(init: RequestInit = {}) {
+  return { ...init, signal: init.signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS) };
+}
 
 export type CloudUser = { id: string; email?: string; user_metadata?: { name?: string } };
 export type CloudSession = { access_token: string; refresh_token: string; expires_in: number; expires_at?: number; user?: CloudUser };
@@ -11,7 +16,7 @@ export type ReminderPreferences = { reminders_enabled: boolean; advance_minutes:
 
 async function authRequest<T>(path: string, init: RequestInit = {}) {
   if (!url || !publishableKey) throw new Error("云端服务尚未配置");
-  const response = await fetch(`${url}/auth/v1/${path}`, { ...init, headers: { apikey: publishableKey, "Content-Type": "application/json", ...init.headers } });
+  const response = await fetch(`${url}/auth/v1/${path}`, withTimeout({ ...init, headers: { apikey: publishableKey, "Content-Type": "application/json", ...init.headers } }));
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.msg ?? data.message ?? data.error_description ?? "请求失败，请稍后重试");
   return data as T;
@@ -64,10 +69,10 @@ export async function signOutCloud(session: CloudSession) {
 
 async function dataRequest<T>(session: CloudSession, path: string, init: RequestInit = {}) {
   if (!url || !publishableKey) throw new Error("云端服务尚未配置");
-  const response = await fetch(`${url}/rest/v1/${path}`, {
+  const response = await fetch(`${url}/rest/v1/${path}`, withTimeout({
     ...init,
     headers: { apikey: publishableKey, Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json", ...init.headers },
-  });
+  }));
   const data = await response.json().catch(() => null);
   if (!response.ok) throw new Error(data?.message ?? data?.hint ?? "家庭数据读取失败");
   return data as T;
